@@ -18,6 +18,61 @@ function write_xml() {
   echo "</ROM>"
 }
 
+function update_target_community() {
+  if [[ "$COS_CB" == true ]]; then
+
+    CUSTOM_URL=true
+    for var in "$@"
+    do
+      if [[ "$var" == "-d" ]]; then
+        CUSTOM_DATE=true
+      fi
+    done
+    version="$COS_VERSION"
+    version_date=$(echo $version | rev | cut -d _ -f 2 | rev)
+    device=$(echo $TARGET_PRODUCT | cut -d _ -f 2,3)
+    android="8.1.0"
+    product=Cosmic-OS_${device}_${android}
+    if [[ "$CUSTOM_DATE" == true ]]; then
+      printf 'Enter date in format YYYYMMDD: '
+      read -r mdate
+      date=$(date -d "$mdate" +'%Y%m%d');
+    else
+      date=$(date +%Y%m%d)
+    fi
+    if [[ "$CUSTOM_URL" == true ]]; then
+      printf 'Enter Direct Download URL: '
+      read -r durl
+      printf 'Enter HTTP / HTTPS URL: '
+      read -r url
+    fi
+    version=$(echo $version | sed -e "s/${version_date}/${date}/g")
+    cd $(gettop)/vendor/community/ota
+    git reset --hard HEAD
+    git pull cosmic-os master
+    mkdir -p $(gettop)/vendor/community/ota/changelogs
+    touch $(gettop)/vendor/community/ota/changelogs/${version}.txt
+    head -n 45 $OUT/cos_${device}-Changelog.txt > $(gettop)/vendor/community/ota/changelogs/${version}.txt
+    editor $(gettop)/vendor/community/ota/changelogs/${version}.txt
+
+    CHANGELOG="$(cat $(gettop)/vendor/community/ota/changelogs/${version}.txt)"
+
+    if [[ -z "$MAINTAINER" ]]; then
+      echo "Who are you?"
+      read MAINTAINER
+      echo "Hello ${MAINTAINER}!"
+    fi
+
+    write_xml > $device.xml
+    git add -A
+    git commit -m "OTA: Update $device ($(date -d "$mdate" +'%d/%m/%Y'))"
+    echo
+      echo "Please push the commit and open a PR."
+  else
+    echo "Device is not official."
+  fi
+}
+
 function update_target() {
   if [[ "$COS_RELEASE" == true ]]; then
 
@@ -37,7 +92,7 @@ function update_target() {
     if [[ "$CUSTOM_DATE" == true ]]; then
       printf 'Enter date in format YYYYMMDD: '
       read -r mdate
-      date=$(date -d "$mdate" +'%Y%m%d'); 
+      date=$(date -d "$mdate" +'%Y%m%d');
     else
       date=$(date +%Y%m%d)
     fi
@@ -66,7 +121,7 @@ function update_target() {
       read MAINTAINER
       echo "Hello ${MAINTAINER}!"
     fi
-    
+
     write_xml > $device.xml
     git add -A
     git commit -m "OTA: Update $device ($(date -d "$mdate" +'%d/%m/%Y'))"
